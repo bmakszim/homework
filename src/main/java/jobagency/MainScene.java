@@ -17,6 +17,8 @@ import jobagency.tables.TrainingsTable;
 import jobagency.tables.UsersTable;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 
 public class MainScene {
 
@@ -55,9 +57,64 @@ public class MainScene {
         Button addUserButton = new Button("Felhasználó hozzáadása");
         addUserButton.setOnAction(e -> new AddUser(connection).showAddUserDialog(usersTable));
 
-        layout.getChildren().addAll(titleLabel, usersTable, addUserButton);
+        Button deleteUserButton = new Button("Felhasználó törlése");
+        deleteUserButton.setOnAction(e -> {
+            User selectedUser = usersTable.getSelectionModel().getSelectedItem();
+            if (selectedUser != null) {
+                deleteUser(selectedUser.getUsername());
+                usersTable.getItems().remove(selectedUser);
+            } else {
+                showAlert("Figyelmeztetés", "Kérlek, válassz ki egy törlendő felhasználót!", Alert.AlertType.WARNING);
+            }
+        });
+
+
+        layout.getChildren().addAll(titleLabel, usersTable, addUserButton, deleteUserButton);
         return layout;
     }
+
+    private void deleteUser(String username) {
+        String deleteFromTrainingUsers = "DELETE FROM training_users WHERE user_id = (SELECT id FROM users WHERE username = ?)";
+        String deleteFromUsers = "DELETE FROM users WHERE username = ?";
+
+        try {
+            connection.setAutoCommit(false); // Új tranzakció
+
+            // Törlés a training_users táblából
+            try (PreparedStatement stmt = connection.prepareStatement(deleteFromTrainingUsers)) {
+                stmt.setString(1, username);
+                stmt.executeUpdate();
+            }
+
+            // Törlés a users táblából
+            try (PreparedStatement stmt = connection.prepareStatement(deleteFromUsers)) {
+                stmt.setString(1, username);
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Felhasználó sikeresen törölve: " + username);
+                } else {
+                    System.out.println("A felhasználó törlése sikertelen. Ellenőrizd, hogy a felhasználó létezik-e.");
+                }
+            }
+
+            connection.commit(); // Tranzakció lezárása
+        } catch (SQLException e) {
+            try {
+                connection.rollback(); // Hibakezelés: tranzakció visszavonása
+                System.out.println("Hiba történt, a tranzakció visszavonva.");
+            } catch (SQLException rollbackEx) {
+                rollbackEx.printStackTrace();
+            }
+            e.printStackTrace();
+        } finally {
+            try {
+                connection.setAutoCommit(true); // Autocommit visszaállítása
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
 
     private VBox createCompaniesTabContent() {
         VBox layout = new VBox(10);
