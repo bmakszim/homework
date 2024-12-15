@@ -62,7 +62,7 @@ public class AddUser {
             }
 
             if (addUserToDatabase(username, password, prefix, name, email, role)) {
-                usersTable.getItems().add(new User(name)); // Frissítjük a táblázatot
+                usersTable.getItems().add(new User(name, prefix, username, email));
                 dialog.close();
             } else {
                 errorLabel.setText("Hiba történt a felhasználó hozzáadása közben.");
